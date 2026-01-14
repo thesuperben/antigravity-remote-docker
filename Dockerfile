@@ -33,6 +33,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # =============================================================================
 # System Dependencies
 # =============================================================================
+ENV REFRESHED_AT=2026-01-15
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core utilities
     ca-certificates \
