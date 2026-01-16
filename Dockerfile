@@ -205,7 +205,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 # =============================================================================
 # Entrypoint
 # =============================================================================
-USER ${USER}
+USER root
 WORKDIR /home/${USER}
 
 ENTRYPOINT ["/opt/scripts/entrypoint.sh"]
