@@ -7,6 +7,10 @@
 
 set -e
 
+# Define target user variables to avoid confusion between Root and Antigravity
+TARGET_USER="antigravity"
+TARGET_HOME="/home/antigravity"
+
 echo "==========================================="
 echo "  Antigravity Remote Docker"
 echo "  Starting container initialization..."
@@ -16,52 +20,51 @@ echo "==========================================="
 # Set VNC Password
 # =============================================================================
 echo "Setting VNC password..."
-mkdir -p ~/.vnc
-echo "${VNC_PASSWORD:-antigravity}" | vncpasswd -f > ~/.vnc/passwd
-chmod 600 ~/.vnc/passwd
+mkdir -p "${TARGET_HOME}/.vnc"
+echo "${VNC_PASSWORD:-antigravity}" | vncpasswd -f > "${TARGET_HOME}/.vnc/passwd"
+chmod 600 "${TARGET_HOME}/.vnc/passwd"
 
 # =============================================================================
 # Create VNC xstartup
 # =============================================================================
 echo "Configuring VNC xstartup..."
-cat > ~/.vnc/xstartup << 'EOF'
+cat > "${TARGET_HOME}/.vnc/xstartup" << EOF
 #!/bin/bash
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 
 # Start D-Bus
-if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
-    eval $(dbus-launch --sh-syntax)
+if [ -z "\$DBUS_SESSION_BUS_ADDRESS" ]; then
+    eval \$(dbus-launch --sh-syntax)
     export DBUS_SESSION_BUS_ADDRESS
 fi
 
 # Set up XDG directories
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_CACHE_HOME="$HOME/.cache"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_RUNTIME_DIR="/tmp/runtime-$USER"
-mkdir -p "$XDG_RUNTIME_DIR"
-chmod 700 "$XDG_RUNTIME_DIR"
+export XDG_CONFIG_HOME="\$HOME/.config"
+export XDG_CACHE_HOME="\$HOME/.cache"
+export XDG_DATA_HOME="\$HOME/.local/share"
+export XDG_RUNTIME_DIR="/tmp/runtime-\$USER"
+mkdir -p "\$XDG_RUNTIME_DIR"
+chmod 700 "\$XDG_RUNTIME_DIR"
 
 # Start XFCE4 desktop
 # Antigravity is auto-launched by supervisor after desktop is ready
 exec startxfce4
 EOF
-chmod +x ~/.vnc/xstartup
 
-chmod +x ~/.vnc/xstartup
+chmod +x "${TARGET_HOME}/.vnc/xstartup"
 
 # =============================================================================
 # Initialize Configuration
 # =============================================================================
 echo "Initializing configuration..."
-mkdir -p ~/.config/xfce4/xfconf/xfce-perchannel-xml
+mkdir -p "${TARGET_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml"
 
 # Apply default panel configuration if not present
-if [ ! -f ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml ]; then
+if [ ! -f "${TARGET_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml" ]; then
     echo "Applying custom panel configuration..."
     if [ -f /opt/defaults/xfce4-panel.xml ]; then
-        cp /opt/defaults/xfce4-panel.xml ~/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml
+        cp /opt/defaults/xfce4-panel.xml "${TARGET_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml"
     else
         echo "Warning: Default panel config not found at /opt/defaults/xfce4-panel.xml"
     fi
@@ -71,21 +74,27 @@ fi
 # Create directories
 # =============================================================================
 echo "Creating workspace directories..."
-mkdir -p ~/workspace ~/.config ~/.antigravity
-
-# =============================================================================
-# Fix permissions
-# =============================================================================
-echo "Fixing permissions..."
-sudo chown -R $(id -u):$(id -g) ~ 2>/dev/null || true
+mkdir -p "${TARGET_HOME}/workspace" "${TARGET_HOME}/.config" "${TARGET_HOME}/.antigravity"
 
 # =============================================================================
 # Check for Antigravity updates (if enabled)
 # =============================================================================
+# We run this BEFORE fixing permissions so any files it creates get fixed too
 if [ "${ANTIGRAVITY_AUTO_UPDATE}" = "true" ]; then
     echo "Checking for Antigravity updates..."
     /opt/scripts/update-antigravity.sh || true
 fi
+
+# =============================================================================
+# Fix permissions (The Critical Fix for Exit Code 13)
+# =============================================================================
+echo "Fixing permissions for ${TARGET_USER}..."
+# Ensure the user owns everything in their home, even if Root created it above
+chown -R ${TARGET_USER}:${TARGET_USER} ${TARGET_HOME}
+
+# Also ensure /var/run/sshd exists for the SSH server
+mkdir -p /var/run/sshd
+chmod 0755 /var/run/sshd
 
 # =============================================================================
 # Display GPU information
@@ -105,6 +114,7 @@ echo "  Connection Information"
 echo "==========================================="
 echo "  noVNC Web Access: http://localhost:${NOVNC_PORT:-6080}"
 echo "  VNC Direct:       localhost:${VNC_PORT:-5901}"
+echo "  SSH Access:       port 22 (mapped)"
 echo "  Password:         (as configured)"
 echo ""
 echo "  Resolution will auto-adjust to browser"
