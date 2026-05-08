@@ -210,8 +210,15 @@ RUN mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-orig && \
     echo '#!/bin/bash\nexec /usr/bin/google-chrome-orig --no-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/google-chrome-stable && \
     chmod +x /usr/bin/google-chrome-stable && \
     mv /usr/bin/antigravity /usr/bin/antigravity-orig && \
-    echo '#!/bin/bash\nexec /usr/bin/antigravity-orig --no-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/antigravity && \
+    echo '#!/bin/bash\nexec /usr/bin/antigravity-orig --no-sandbox --disable-dev-shm-usage --enable-features=CustomAIEndpoints,UnmanagedModels "$@"' > /usr/bin/antigravity \
     chmod +x /usr/bin/antigravity
+
+# =============================================================================
+# Spoof Cloudtop Environment for Custom LLMs
+# =============================================================================
+RUN mkdir -p /usr/local/google/home/${USER} && \
+    chown -R ${USER}:${USER} /usr/local/google && \
+    ln -s /home/${USER}/workspace /usr/local/google/home/${USER}/workspace
 
 # =============================================================================
 # Entrypoint
