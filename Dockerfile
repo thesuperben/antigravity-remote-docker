@@ -203,6 +203,17 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${NOVNC_PORT}/ || exit 1
 
 # =============================================================================
+# Patch Chromium-based Binaries (Sandbox & Root Bypass)
+# =============================================================================
+# Rename original binaries and replace with wrappers that force sandbox bypass flags
+RUN mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-orig && \
+    echo '#!/bin/bash\nexec /usr/bin/google-chrome-orig --no-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/google-chrome-stable && \
+    chmod +x /usr/bin/google-chrome-stable && \
+    mv /usr/bin/antigravity /usr/bin/antigravity-orig && \
+    echo '#!/bin/bash\nexec /usr/bin/antigravity-orig --no-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/antigravity && \
+    chmod +x /usr/bin/antigravity
+
+# =============================================================================
 # Entrypoint
 # =============================================================================
 USER root
