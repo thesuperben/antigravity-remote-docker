@@ -29,7 +29,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     GID=1000 \
     HOME=/home/antigravity \
     # Antigravity settings
-    ANTIGRAVITY_AUTO_UPDATE=true
+    ANTIGRAVITY_AUTO_UPDATE=true \
+    # Python settings (Allows global pip installs for the agent)
+    PIP_BREAK_SYSTEM_PACKAGES=1
 
 # =============================================================================
 # System Dependencies & Development Tools
@@ -80,6 +82,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     wmctrl \
     xdotool \
+    # --- E2E Testing Dependencies (Playwright/Puppeteer) ---
+    libgbm1 \
+    libxshmfence1 \
+    libnss3 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
     # --- Development Tools ---
     git \
     build-essential \
@@ -158,6 +166,13 @@ RUN groupadd -g ${GID} ${USER} \
     && echo "${USER}:antigravity" | chpasswd
 
 # =============================================================================
+# Configure Agent Git Identity
+# =============================================================================
+RUN sudo -u ${USER} git config --global user.name "Antigravity Agent" \
+    && sudo -u ${USER} git config --global user.email "agent@antigravity.local" \
+    && sudo -u ${USER} git config --global init.defaultBranch main
+
+# =============================================================================
 # Configure VNC and Desktop
 # =============================================================================
 RUN mkdir -p /home/${USER}/.vnc /home/${USER}/.config /home/${USER}/.local/share/keyrings \
@@ -203,22 +218,23 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:${NOVNC_PORT}/ || exit 1
 
 # =============================================================================
-# Patch Chromium-based Binaries (Sandbox & Root Bypass)
-# =============================================================================
-# Rename original binaries and replace with wrappers that force sandbox bypass flags
-RUN mv /usr/bin/google-chrome-stable /usr/bin/google-chrome-orig && \
-    echo '#!/bin/bash\nexec /usr/bin/google-chrome-orig --no-sandbox --disable-dev-shm-usage "$@"' > /usr/bin/google-chrome-stable && \
-    chmod +x /usr/bin/google-chrome-stable && \
-    mv /usr/bin/antigravity /usr/bin/antigravity-orig && \
-    echo '#!/bin/bash\nexec /usr/bin/antigravity-orig --no-sandbox --disable-dev-shm-usage --enable-features=CustomAIEndpoints,UnmanagedModels "$@"' > /usr/bin/antigravity \
-    chmod +x /usr/bin/antigravity
-
-# =============================================================================
 # Spoof Cloudtop Environment for Custom LLMs
 # =============================================================================
 RUN mkdir -p /usr/local/google/home/${USER} && \
     chown -R ${USER}:${USER} /usr/local/google && \
     ln -s /home/${USER}/workspace /usr/local/google/home/${USER}/workspace
+
+# =============================================================================
+# Path Interceptors (Sandbox, Root Bypass, & Custom LLM Flags)
+# =============================================================================
+# Place wrapper scripts higher in the $PATH so they intercept calls to the apps.
+# Using printf avoids cross-shell escaping issues that cause "Permission denied".
+RUN printf '#!/bin/bash\nexec /usr/bin/google-chrome-stable --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/google-chrome-stable && \
+    chmod 755 /usr/local/bin/google-chrome-stable && \
+    printf '#!/bin/bash\nexec /usr/bin/google-chrome-stable --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/local/bin/google-chrome && \
+    chmod 755 /usr/local/bin/google-chrome && \
+    printf '#!/bin/bash\nexec /usr/bin/antigravity --no-sandbox --disable-dev-shm-usage --enable-features=CustomAIEndpoints,UnmanagedModels "$@"\n' > /usr/local/bin/antigravity && \
+    chmod 755 /usr/local/bin/antigravity
 
 # =============================================================================
 # Entrypoint
