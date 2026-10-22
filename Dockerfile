@@ -37,7 +37,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # System Dependencies & Development Tools
 # =============================================================================
 # Change this date to force a cache rebuild when new package versions are out
-ENV REFRESHED_AT=2026-04-24
+ENV REFRESHED_AT=2026-10-22
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     # Core utilities
